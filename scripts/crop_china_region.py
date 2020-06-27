@@ -2,7 +2,7 @@
 
 import argparse
 from netCDF4 import Dataset
-import geopandas as gpd
+import fiona
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
@@ -18,14 +18,14 @@ if not os.path.isfile(args.data):
 	exit(1)
 
 def create_mask_array(lon, lat, shapefile_path):
-	df = gpd.read_file(shapefile_path)
+	shapefile = fiona.open(shapefile_path)
 
-	shapes = [(polygon, 1) for polygon in df['geometry']]
+	shapes = [(feature['geometry'], 1) for feature in shapefile]
 
-	min_raster_lon = df['geometry'].total_bounds[0]
-	min_raster_lat = df['geometry'].total_bounds[1]
-	max_raster_lon = df['geometry'].total_bounds[2]
-	max_raster_lat = df['geometry'].total_bounds[3]
+	min_raster_lon = shapefile.bounds[0]
+	min_raster_lat = shapefile.bounds[1]
+	max_raster_lon = shapefile.bounds[2]
+	max_raster_lat = shapefile.bounds[3]
 	num_raster_lon = 1000
 	num_raster_lat = 1000
 	raster_dlon = (max_raster_lon - min_raster_lon) / num_raster_lon
@@ -34,7 +34,7 @@ def create_mask_array(lon, lat, shapefile_path):
 	raster_lat = np.linspace(min_raster_lat, max_raster_lat, num_raster_lat)
 	raster = np.zeros((num_raster_lat, num_raster_lon))
 
-	transform = rasterio.transform.from_bounds(*df['geometry'].total_bounds, num_raster_lat, num_raster_lon)
+	transform = rasterio.transform.from_bounds(*shapefile.bounds, num_raster_lat, num_raster_lon)
 
 	rasterize(shapes=shapes, out=raster, transform=transform, all_touched=True)
 	raster = raster[::-1,:]
@@ -47,6 +47,8 @@ def create_mask_array(lon, lat, shapefile_path):
 			if 0 <= ri < num_raster_lon and 0 <= rj < num_raster_lat:
 				if raster[rj,ri] == 1:
 					mask[j,i] = 1
+
+	shapefile.close()
 
 	return mask
 
