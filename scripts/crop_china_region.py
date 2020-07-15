@@ -2,7 +2,7 @@
 
 import argparse
 from netCDF4 import Dataset
-import geopandas as gpd
+import fiona
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
@@ -22,10 +22,10 @@ if not os.path.isfile(args.data):
 	exit(1)
 
 def create_mask_array(lon, lat, shapefile_path, include_sea=False):
-	df = gpd.read_file(shapefile_path)
-	bbox = df['geometry'].total_bounds
+	shapefile = fiona.open(shapefile_path)
+	bbox = list(shapefile.bounds)
 
-	shapes = [(polygon, 1) for polygon in df['geometry']]
+	shapes = [(feature['geometry'], 1) for feature in shapefile]
 
 	if include_sea:
 		shapes.append((get_china_territorial_sea_polygon(), 1))
@@ -59,6 +59,8 @@ def create_mask_array(lon, lat, shapefile_path, include_sea=False):
 			if 0 <= ri < num_raster_lon and 0 <= rj < num_raster_lat:
 				if raster[rj,ri] == 1:
 					mask[j,i] = 1
+
+	shapefile.close()
 
 	return mask
 
